@@ -122,7 +122,7 @@ fi
 ###############################################################################
 # Sulphur Prompt Enhancer (optional, ~10GB)
 ###############################################################################
-if [ "${DOWNLOAD_PROMPT_ENHANCER:-false}" == "true" ]; then
+if [ "${DOWNLOAD_PROMPT_ENHANCER:-true}" == "true" ]; then
     echo "[INFO] === Sulphur Prompt Enhancer ==="
     download "${SULPHUR_BASE}/prompt_enhancer/sulphur_prompt_enhancer_model-q8_0.gguf" \
              "$PE/sulphur_prompt_enhancer_model-q8_0.gguf"

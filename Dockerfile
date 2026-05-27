@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git wget curl aria2 \
     libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender1 \
     ffmpeg \
+    cmake build-essential \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf python3.11 /usr/bin/python3
 
@@ -28,6 +29,8 @@ RUN cd /comfyui/custom_nodes && \
     pip install --no-cache-dir -r ComfyUI-KJNodes/requirements.txt
 
 RUN pip install --no-cache-dir runpod requests
+
+RUN CMAKE_ARGS="-DGGML_CUDA=on" FORCE_CMAKE=1 pip install --no-cache-dir llama-cpp-python
 
 COPY handler.py /handler.py
 COPY download_models.sh /download_models.sh

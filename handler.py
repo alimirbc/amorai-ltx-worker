@@ -15,7 +15,13 @@ COMFYUI_PORT = "8188"
 COMFYUI_URL = f"http://{COMFYUI_HOST}:{COMFYUI_PORT}"
 COMFYUI_PATH = os.environ.get("COMFYUI_PATH", "/comfyui")
 
+PROMPT_ENHANCER_MODEL = "/runpod-volume/models/prompt_enhancer/sulphur_prompt_enhancer_model-q8_0.gguf"
+PROMPT_ENHANCER_MMPROJ = "/runpod-volume/models/prompt_enhancer/mmproj-BF16.gguf"
+
+PROMPT_NODE_ID = "29"
+
 comfyui_process = None
+enhancer_llm = None
 
 
 def start_comfyui():
@@ -24,8 +30,8 @@ def start_comfyui():
     comfyui_process = subprocess.Popen(
         ["python3", "main.py", "--listen", COMFYUI_HOST, "--port", COMFYUI_PORT],
         cwd=COMFYUI_PATH,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+        stdout=sys.stdout,
+        stderr=sys.stderr,
     )
 
 
@@ -45,6 +51,74 @@ def wait_for_comfyui(timeout=300):
         time.sleep(2)
     print("[ERROR] ComfyUI did not start in time.", flush=True)
     return False
+
+
+def load_enhancer():
+    global enhancer_llm
+    if not os.path.exists(PROMPT_ENHANCER_MODEL) or not os.path.exists(PROMPT_ENHANCER_MMPROJ):
+        print("[prompt-enhancer] Model files not found — skipping.", flush=True)
+        return
+    try:
+        from llama_cpp import Llama
+        from llama_cpp.llama_chat_format import LlavaR11ChatHandler
+        print("[prompt-enhancer] Loading model...", flush=True)
+        chat_handler = LlavaR11ChatHandler(
+            clip_model_path=PROMPT_ENHANCER_MMPROJ,
+            verbose=False,
+        )
+        enhancer_llm = Llama(
+            model_path=PROMPT_ENHANCER_MODEL,
+            chat_handler=chat_handler,
+            n_ctx=2048,
+            n_gpu_layers=-1,
+            verbose=False,
+        )
+        print("[prompt-enhancer] Ready.", flush=True)
+    except Exception as e:
+        print(f"[prompt-enhancer] Failed to load: {e}", flush=True)
+        enhancer_llm = None
+
+
+def enhance_prompt(prompt: str, image_b64: str | None = None) -> str:
+    if enhancer_llm is None:
+        return prompt
+    try:
+        if image_b64:
+            content = [
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/png;base64,{image_b64}"},
+                },
+                {
+                    "type": "text",
+                    "text": (
+                        "You are a cinematic video prompt enhancer for the Sulphur-2 AI model. "
+                        "Based on the image and the user's intent below, write a single detailed "
+                        "video generation prompt describing the scene's visuals, lighting, motion, "
+                        "and atmosphere. Output only the enhanced prompt, no extra commentary.\n\n"
+                        f"User intent: {prompt}"
+                    ),
+                },
+            ]
+        else:
+            content = (
+                "You are a cinematic video prompt enhancer for the Sulphur-2 AI model. "
+                "Rewrite the following as a detailed video generation prompt. "
+                "Output only the enhanced prompt, no extra commentary.\n\n"
+                f"User intent: {prompt}"
+            )
+
+        result = enhancer_llm.create_chat_completion(
+            messages=[{"role": "user", "content": content}],
+            max_tokens=384,
+            temperature=0.7,
+        )
+        enhanced = result["choices"][0]["message"]["content"].strip()
+        print(f"[prompt-enhancer] {enhanced[:120]}...", flush=True)
+        return enhanced
+    except Exception as e:
+        print(f"[prompt-enhancer] Enhancement failed, using original: {e}", flush=True)
+        return prompt
 
 
 def upload_image(image_b64: str, filename: str) -> str:
@@ -116,6 +190,19 @@ def handler(job):
         return {"error": "No workflow provided in job input"}
 
     images = job_input.get("images", [])
+
+    # --- Prompt enhancement ---
+    # Extract the raw prompt from node 29, enhance it with the reference image
+    raw_prompt = ""
+    if PROMPT_NODE_ID in workflow:
+        raw_prompt = workflow[PROMPT_NODE_ID].get("inputs", {}).get("value", "")
+
+    if raw_prompt and enhancer_llm is not None:
+        first_image_b64 = images[0]["image"] if images else None
+        enhanced = enhance_prompt(raw_prompt, first_image_b64)
+        workflow[PROMPT_NODE_ID]["inputs"]["value"] = enhanced
+
+    # --- Upload reference images ---
     for img in images:
         name = img.get("name")
         data = img.get("image")
@@ -164,6 +251,8 @@ if __name__ == "__main__":
     start_comfyui()
     if not wait_for_comfyui():
         sys.exit(1)
+
+    load_enhancer()
 
     print("[INFO] Starting RunPod serverless handler...", flush=True)
     runpod.serverless.start({"handler": handler})
