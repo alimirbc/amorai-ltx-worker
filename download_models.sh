@@ -21,7 +21,7 @@ download() {
     fi
 }
 
-VOLUME=/workspace/models
+VOLUME=/runpod-volume/models
 CKPT=$VOLUME/checkpoints
 LORA=$VOLUME/loras
 LORA_LTX23=$VOLUME/loras/ltx23

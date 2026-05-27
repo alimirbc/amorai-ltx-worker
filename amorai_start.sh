@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-VOLUME=/workspace
+VOLUME=/runpod-volume
 COMFYUI_MODELS=/comfyui/models
 
 echo "[AmorAI] Setting up volume model directories..."
