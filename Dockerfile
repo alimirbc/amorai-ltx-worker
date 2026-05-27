@@ -31,6 +31,7 @@ RUN cd /comfyui/custom_nodes && \
 RUN pip install --no-cache-dir runpod requests
 
 RUN pip install --no-cache-dir \
+    --timeout 300 --retries 5 \
     llama-cpp-python \
     --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124
 
