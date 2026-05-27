@@ -31,7 +31,7 @@ RUN pip install --no-cache-dir runpod requests
 
 RUN pip install --no-cache-dir \
     llama-cpp-python \
-    --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu128
+    --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124
 
 COPY handler.py /handler.py
 COPY download_models.sh /download_models.sh
