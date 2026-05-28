@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git wget curl aria2 \
     libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender1 \
     ffmpeg \
+    cmake gcc g++ build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /comfyui
@@ -27,6 +28,9 @@ RUN pip install --no-cache-dir "kornia==0.7.4" && \
     KORNIA_DIR=$(python3 -c "import kornia, pathlib; print(pathlib.Path(kornia.__file__).parent)") && \
     find "$KORNIA_DIR" -name "*.py" -exec sed -i '/^@torch\.jit\.script$/d' {} \;
 
+RUN CMAKE_ARGS="-DGGML_CUDA=OFF" pip install --no-cache-dir \
+    --timeout 600 --retries 3 \
+    "llama-cpp-python>=0.3.2"
 
 COPY handler.py /handler.py
 COPY download_models.sh /download_models.sh
