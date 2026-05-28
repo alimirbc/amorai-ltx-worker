@@ -4,23 +4,6 @@
 
 set -e
 
-download() {
-    local url="$1"
-    local out="$2"
-    if [ ! -f "$out" ]; then
-        echo "  ↳ Downloading $(basename $out)..."
-        mkdir -p "$(dirname $out)"
-        if command -v aria2c &>/dev/null; then
-            aria2c --console-log-level=error -c -x 16 -s 16 -k 1M \
-                -d "$(dirname $out)" -o "$(basename $out)" "$url"
-        else
-            wget -q --show-progress -O "$out" "$url" || curl -L -o "$out" "$url"
-        fi
-    else
-        echo "  ✓ $(basename $out) already present"
-    fi
-}
-
 VOLUME=/runpod-volume/models
 CKPT=$VOLUME/checkpoints
 LORA=$VOLUME/loras
@@ -32,6 +15,74 @@ UPSCALE=$VOLUME/upscale_models
 PE=$VOLUME/prompt_enhancer
 
 mkdir -p "$CKPT" "$LORA" "$LORA_LTX23" "$VAE" "$TXT" "$LATENT_UP" "$UPSCALE" "$PE"
+
+# Verify a .safetensors file has a valid header (not truncated/corrupt).
+# Returns 0 if valid, 1 if corrupt or missing.
+verify_safetensors() {
+    local f="$1"
+    [ -f "$f" ] || return 1
+    python3 - "$f" <<'PYEOF'
+import struct, json, sys
+path = sys.argv[1]
+try:
+    with open(path, 'rb') as h:
+        raw = h.read(8)
+        if len(raw) < 8:
+            sys.exit(1)
+        n = struct.unpack('<Q', raw)[0]
+        if n == 0 or n > 100 * 1024 * 1024:
+            sys.exit(1)
+        header_bytes = h.read(n)
+        if len(header_bytes) < n:
+            sys.exit(1)
+        json.loads(header_bytes)
+    sys.exit(0)
+except Exception as e:
+    print(f"[verify] {path}: {e}", file=sys.stderr)
+    sys.exit(1)
+PYEOF
+}
+
+download() {
+    local url="$1"
+    local out="$2"
+    local basename
+    basename="$(basename "$out")"
+
+    # For .safetensors files: verify header integrity, delete if corrupt.
+    if [[ "$out" == *.safetensors ]] && [ -f "$out" ]; then
+        if verify_safetensors "$out"; then
+            echo "  ✓ $basename already present and valid"
+            return 0
+        else
+            echo "  ⚠ $basename is corrupt or truncated — re-downloading..."
+            rm -f "$out"
+        fi
+    elif [ -f "$out" ]; then
+        echo "  ✓ $basename already present"
+        return 0
+    fi
+
+    echo "  ↳ Downloading $basename..."
+    mkdir -p "$(dirname "$out")"
+    if command -v aria2c &>/dev/null; then
+        aria2c --console-log-level=error -c -x 16 -s 16 -k 1M \
+            -d "$(dirname "$out")" -o "$basename" "$url"
+    else
+        wget -q --show-progress -O "$out" "$url" || curl -L -o "$out" "$url"
+    fi
+
+    # Post-download integrity check for safetensors.
+    if [[ "$out" == *.safetensors ]]; then
+        if ! verify_safetensors "$out"; then
+            echo "  ✗ $basename failed integrity check after download — deleting."
+            rm -f "$out"
+            echo "  ✗ FATAL: Could not download a valid $basename. Aborting." >&2
+            exit 1
+        fi
+        echo "  ✓ $basename integrity verified."
+    fi
+}
 
 SULPHUR_BASE="https://huggingface.co/SulphurAI/Sulphur-2-base/resolve/main"
 TENEROS_BASE="https://huggingface.co/TenStrip/LTX2.3-10Eros/resolve/main"
