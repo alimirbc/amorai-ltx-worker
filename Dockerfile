@@ -18,6 +18,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 RUN cd /comfyui/custom_nodes && \
     git clone https://github.com/Lightricks/ComfyUI-LTXVideo.git && \
+    cd ComfyUI-LTXVideo && git checkout 2acf7af8991f && cd .. && \
     pip install --no-cache-dir -r ComfyUI-LTXVideo/requirements.txt && \
     git clone https://github.com/kijai/ComfyUI-KJNodes.git && \
     pip install --no-cache-dir -r ComfyUI-KJNodes/requirements.txt
