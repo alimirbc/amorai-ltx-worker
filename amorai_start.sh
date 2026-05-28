@@ -30,8 +30,10 @@ done
 echo "[AmorAI] Downloading models (skips existing files)..."
 bash /download_models.sh
 
-echo "[AmorAI] Updating ComfyUI to latest (for new node support)..."
-cd /comfyui && git pull origin master --ff-only 2>&1 || echo "[AmorAI] git pull failed (offline?), using cached version"
+echo "[AmorAI] Updating ComfyUI and custom nodes to latest..."
+cd /comfyui && git pull origin master --ff-only 2>&1 || echo "[AmorAI] ComfyUI git pull failed, using cached version"
+cd /comfyui/custom_nodes/ComfyUI-KJNodes && git pull origin main --ff-only 2>&1 || echo "[AmorAI] KJNodes git pull failed, using cached version"
+cd /comfyui/custom_nodes/ComfyUI-LTXVideo && git pull origin main --ff-only 2>&1 || echo "[AmorAI] LTXVideo git pull failed, using cached version"
 
 echo "[AmorAI] Launching RunPod handler..."
 exec python3 -u /handler.py
