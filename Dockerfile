@@ -24,8 +24,8 @@ RUN cd /comfyui/custom_nodes && \
 RUN pip install --no-cache-dir runpod requests
 
 RUN pip install --no-cache-dir "kornia==0.7.4" && \
-    find /usr/local/lib/python3.11/dist-packages/kornia -name "*.py" \
-        -exec sed -i '/^@torch\.jit\.script$/d' {} \;
+    KORNIA_DIR=$(python3 -c "import kornia, pathlib; print(pathlib.Path(kornia.__file__).parent)") && \
+    find "$KORNIA_DIR" -name "*.py" -exec sed -i '/^@torch\.jit\.script$/d' {} \;
 
 RUN pip install --no-cache-dir \
     --timeout 300 --retries 5 \
