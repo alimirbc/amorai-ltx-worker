@@ -149,8 +149,13 @@ def queue_workflow(workflow: dict) -> tuple[str, str]:
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(req) as r:
-        result = json.loads(r.read().decode())
+    try:
+        with urllib.request.urlopen(req) as r:
+            result = json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        print(f"[ERROR] ComfyUI /prompt rejected ({e.code}): {body}", flush=True)
+        raise urllib.error.HTTPError(e.url, e.code, f"{e.reason} | body: {body}", e.headers, None)
     return result["prompt_id"], client_id
 
 

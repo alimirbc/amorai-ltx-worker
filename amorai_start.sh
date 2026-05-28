@@ -30,5 +30,8 @@ done
 echo "[AmorAI] Downloading models (skips existing files)..."
 bash /download_models.sh
 
+echo "[AmorAI] Updating ComfyUI to latest (for new node support)..."
+cd /comfyui && git pull origin master --ff-only 2>&1 || echo "[AmorAI] git pull failed (offline?), using cached version"
+
 echo "[AmorAI] Launching RunPod handler..."
 exec python3 -u /handler.py
