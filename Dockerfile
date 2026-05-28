@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+FROM pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -6,16 +6,10 @@ ENV PYTHONUNBUFFERED=1
 ENV COMFYUI_PATH=/comfyui
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.11 python3-pip python3.11-venv \
     git wget curl aria2 \
     libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender1 \
     ffmpeg \
-    && rm -rf /var/lib/apt/lists/* \
-    && ln -sf python3.11 /usr/bin/python3
-
-RUN pip install --no-cache-dir \
-    torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
-    --index-url https://download.pytorch.org/whl/cu124
+    && rm -rf /var/lib/apt/lists/*
 
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git /comfyui
 WORKDIR /comfyui
@@ -35,7 +29,7 @@ RUN pip install --no-cache-dir "kornia==0.7.4" && \
 
 RUN pip install --no-cache-dir \
     --timeout 300 --retries 5 \
-    llama-cpp-python \
+    "llama-cpp-python>=0.3.2" \
     --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124
 
 COPY handler.py /handler.py
