@@ -1,4 +1,4 @@
-FROM pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime
+FROM pytorch/pytorch:2.7.0-cuda12.8-cudnn9-runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -30,7 +30,7 @@ RUN pip install --no-cache-dir "kornia==0.7.4" && \
 RUN pip install --no-cache-dir \
     --timeout 300 --retries 5 \
     "llama-cpp-python>=0.3.2" \
-    --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124
+    --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu128
 
 COPY handler.py /handler.py
 COPY download_models.sh /download_models.sh
