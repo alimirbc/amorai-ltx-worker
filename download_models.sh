@@ -46,21 +46,32 @@ PYEOF
 download() {
     local url="$1"
     local out="$2"
+    local min_bytes="${3:-0}"   # optional minimum file size in bytes (catches aria2c pre-alloc zeros)
     local basename
     basename="$(basename "$out")"
 
-    # For .safetensors files: verify header integrity, delete if corrupt.
-    if [[ "$out" == *.safetensors ]] && [ -f "$out" ]; then
-        if verify_safetensors "$out"; then
-            echo "  ✓ $basename already present and valid"
-            return 0
-        else
-            echo "  ⚠ $basename is corrupt or truncated — re-downloading..."
+    if [ -f "$out" ]; then
+        local actual_size
+        actual_size=$(stat -c%s "$out" 2>/dev/null || stat -f%z "$out" 2>/dev/null || echo 0)
+
+        # Size check first: aria2c pre-allocates full file size then fills it in.
+        # A file that is smaller than expected is incomplete even if the header looks valid.
+        if [ "$min_bytes" -gt 0 ] && [ "$actual_size" -lt "$min_bytes" ]; then
+            echo "  ⚠ $basename is too small ($(( actual_size / 1024 / 1024 ))MiB < $(( min_bytes / 1024 / 1024 ))MiB minimum) — re-downloading..."
             rm -f "$out"
+        # Header integrity check for safetensors.
+        elif [[ "$out" == *.safetensors ]]; then
+            if verify_safetensors "$out"; then
+                echo "  ✓ $basename already present and valid"
+                return 0
+            else
+                echo "  ⚠ $basename is corrupt or truncated — re-downloading..."
+                rm -f "$out"
+            fi
+        else
+            echo "  ✓ $basename already present"
+            return 0
         fi
-    elif [ -f "$out" ]; then
-        echo "  ✓ $basename already present"
-        return 0
     fi
 
     echo "  ↳ Downloading $basename..."
@@ -80,6 +91,17 @@ download() {
             echo "  ✗ FATAL: Could not download a valid $basename. Aborting." >&2
             exit 1
         fi
+        # Also verify size if minimum was specified.
+        if [ "$min_bytes" -gt 0 ]; then
+            local final_size
+            final_size=$(stat -c%s "$out" 2>/dev/null || stat -f%z "$out" 2>/dev/null || echo 0)
+            if [ "$final_size" -lt "$min_bytes" ]; then
+                echo "  ✗ $basename is still too small after download — deleting."
+                rm -f "$out"
+                echo "  ✗ FATAL: $basename did not download fully. Aborting." >&2
+                exit 1
+            fi
+        fi
         echo "  ✓ $basename integrity verified."
     fi
 }
@@ -94,7 +116,8 @@ KIJAI_BASE="https://huggingface.co/Kijai/LTX2.3_comfy/resolve/main"
 ###############################################################################
 echo "[INFO] === Text Encoders ==="
 download "https://huggingface.co/GitMylo/LTX-2-comfy_gemma_fp8_e4m3fn/resolve/main/gemma_3_12B_it_fp8_e4m3fn.safetensors" \
-         "$TXT/gemma_3_12B_it_fp8_e4m3fn.safetensors"
+         "$TXT/gemma_3_12B_it_fp8_e4m3fn.safetensors" \
+         11811160064   # 11 GiB minimum (actual ~12.3 GiB)
 
 # Optional: fp4 variant (~6GB). Lower quality than fp8. Set true if you want
 # to experiment with a faster/smaller text encoder. Not used by default workflow.
@@ -147,10 +170,12 @@ fi
 ###############################################################################
 echo "[INFO] === Sulphur-2 Models ==="
 download "${SULPHUR_BASE}/sulphur_dev_fp8mixed.safetensors" \
-         "$CKPT/sulphur_dev_fp8mixed.safetensors"
+         "$CKPT/sulphur_dev_fp8mixed.safetensors" \
+         27917287424   # 26 GiB minimum (actual ~27.2 GiB)
 
 download "${SULPHUR_BASE}/sulphur_lora_rank_768.safetensors" \
-         "$LORA/sulphur_lora_rank_768.safetensors"
+         "$LORA/sulphur_lora_rank_768.safetensors" \
+         17179869184   # 16 GiB minimum (actual ~17.0 GiB)
 
 download "${SULPHUR_BASE}/distill_loras/ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors" \
          "$LORA_LTX23/ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors"
