@@ -30,10 +30,24 @@ done
 echo "[AmorAI] Downloading models (skips existing files)..."
 bash /download_models.sh
 
-echo "[AmorAI] All custom nodes pinned to Docker image versions (no runtime updates)"
-echo "[AmorAI]   ComfyUI         — pinned (master at image build time)"
-echo "[AmorAI]   ComfyUI-LTXVideo — pinned to 2acf7af8991f"
-echo "[AmorAI]   ComfyUI-KJNodes  — pinned to 6dd3c674"
+LTXVIDEO_DIR=/comfyui/custom_nodes/ComfyUI-LTXVideo
+
+echo "[AmorAI] Updating ComfyUI-LTXVideo to latest main..."
+PREV_COMMIT=$(git -C "$LTXVIDEO_DIR" rev-parse HEAD 2>/dev/null || echo "unknown")
+git -C "$LTXVIDEO_DIR" fetch --quiet origin
+git -C "$LTXVIDEO_DIR" checkout -B main origin/main
+NEW_COMMIT=$(git -C "$LTXVIDEO_DIR" rev-parse HEAD)
+echo "[AmorAI]   ComfyUI-LTXVideo updated: ${PREV_COMMIT:0:10} → ${NEW_COMMIT:0:10}"
+
+if [ "$PREV_COMMIT" != "$NEW_COMMIT" ]; then
+    echo "[AmorAI]   Installing updated requirements..."
+    pip install --quiet --no-cache-dir -r "$LTXVIDEO_DIR/requirements.txt" 2>&1 | tail -3 || true
+else
+    echo "[AmorAI]   Already at latest, skipping pip install."
+fi
+
+echo "[AmorAI]   ComfyUI          — pinned (master at image build time)"
+echo "[AmorAI]   ComfyUI-KJNodes  — pinned to 6dd3c674 (no comfy/float.py conflict)"
 
 echo "[AmorAI] Launching RunPod handler..."
 exec python3 -u /handler.py
