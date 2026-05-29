@@ -166,36 +166,39 @@ if [ "${DOWNLOAD_UPSCALER_V11:-false}" == "true" ]; then
 fi
 
 ###############################################################################
-# REQUIRED: Sulphur-2 core models
+# REQUIRED: 10Eros base model (~29GB) — primary model for the i2v workflow
 ###############################################################################
-echo "[INFO] === Sulphur-2 Models ==="
-download "${SULPHUR_BASE}/sulphur_dev_fp8mixed.safetensors" \
-         "$CKPT/sulphur_dev_fp8mixed.safetensors" \
-         27917287424   # 26 GiB minimum (actual ~27.2 GiB)
+echo "[INFO] === 10Eros Model ==="
+download "${TENEROS_BASE}/10Eros_v1-fp8mixed_learned.safetensors" \
+         "$CKPT/10Eros_v1-fp8mixed_learned.safetensors" \
+         27917287424   # 26 GiB minimum (actual ~29.2 GiB)
 
-download "${SULPHUR_BASE}/sulphur_lora_rank_768.safetensors" \
-         "$LORA/sulphur_lora_rank_768.safetensors" \
-         9663676416    # 9 GiB minimum (actual ~9.56 GiB / 10.3 GB)
+###############################################################################
+# REQUIRED: SulphurEXP LoRA (~2.35GB) — applied at strength 0.3 over 10Eros
+###############################################################################
+echo "[INFO] === SulphurEXP LoRA ==="
+download "https://huggingface.co/maximsobolev275/LTX-SulphurExperimental-LoRA-Optimized/resolve/main/LTX_SulphurEXP_LoRA_fro99-avgrank105.safetensors" \
+         "$LORA/LTX_SulphurEXP_LoRA_fro99-avgrank105.safetensors"
 
+###############################################################################
+# REQUIRED: Distilled LoRA for fast inference
+###############################################################################
+echo "[INFO] === Distilled LoRA ==="
 download "${SULPHUR_BASE}/distill_loras/ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors" \
          "$LORA_LTX23/ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors"
 
 ###############################################################################
-# REQUIRED: Edit-Anything LoRA (used by Sulphur i2v workflow)
+# Optional: Legacy Sulphur-2 models (kept for reference, not used by workflow)
+# Set DOWNLOAD_SULPHUR_LEGACY=true to download these.
 ###############################################################################
-echo "[INFO] === Edit-Anything LoRA ==="
-download "https://huggingface.co/Alissonerdx/LTX-LoRAs/resolve/main/ltx23_edit_anything_global_rank128_v1_9000steps_adamw.safetensors" \
-         "$LORA_LTX23/ltx23_edit_anything_global_rank128_v1_9000steps_adamw.safetensors"
-
-###############################################################################
-# Optional: 10Eros NSFW Model (~29GB)
-# A separate NSFW base model. Not used by Sulphur workflow.
-# Set DOWNLOAD_10EROS=true on the RunPod endpoint to enable.
-###############################################################################
-if [ "${DOWNLOAD_10EROS:-false}" == "true" ]; then
-    echo "[INFO] === 10Eros Model ==="
-    download "${TENEROS_BASE}/10Eros_v1-fp8mixed_learned.safetensors" \
-             "$CKPT/10Eros_v1-fp8mixed_learned.safetensors"
+if [ "${DOWNLOAD_SULPHUR_LEGACY:-false}" == "true" ]; then
+    echo "[INFO] === Legacy Sulphur-2 Models ==="
+    download "${SULPHUR_BASE}/sulphur_dev_fp8mixed.safetensors" \
+             "$CKPT/sulphur_dev_fp8mixed.safetensors" \
+             27917287424
+    download "${SULPHUR_BASE}/sulphur_lora_rank_768.safetensors" \
+             "$LORA/sulphur_lora_rank_768.safetensors" \
+             9663676416
 fi
 
 ###############################################################################
