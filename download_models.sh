@@ -175,7 +175,7 @@ download "${SULPHUR_BASE}/sulphur_dev_fp8mixed.safetensors" \
 
 download "${SULPHUR_BASE}/sulphur_lora_rank_768.safetensors" \
          "$LORA/sulphur_lora_rank_768.safetensors" \
-         17179869184   # 16 GiB minimum (actual ~17.0 GiB)
+         9663676416    # 9 GiB minimum (actual ~9.56 GiB / 10.3 GB)
 
 download "${SULPHUR_BASE}/distill_loras/ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors" \
          "$LORA_LTX23/ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors"

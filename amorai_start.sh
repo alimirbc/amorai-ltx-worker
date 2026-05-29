@@ -30,10 +30,10 @@ done
 echo "[AmorAI] Downloading models (skips existing files)..."
 bash /download_models.sh
 
-echo "[AmorAI] Updating ComfyUI and custom nodes to latest..."
-cd /comfyui && git pull origin master --ff-only 2>&1 || echo "[AmorAI] ComfyUI git pull failed, using cached version"
-cd /comfyui/custom_nodes/ComfyUI-KJNodes && git pull origin main --ff-only 2>&1 || echo "[AmorAI] KJNodes git pull failed, using cached version"
-echo "[AmorAI] ComfyUI-LTXVideo pinned to Docker image version (no runtime update)"
+echo "[AmorAI] All custom nodes pinned to Docker image versions (no runtime updates)"
+echo "[AmorAI]   ComfyUI         — pinned (master at image build time)"
+echo "[AmorAI]   ComfyUI-LTXVideo — pinned to 2acf7af8991f"
+echo "[AmorAI]   ComfyUI-KJNodes  — pinned to 6dd3c674"
 
 echo "[AmorAI] Launching RunPod handler..."
 exec python3 -u /handler.py
