@@ -1,5 +1,6 @@
 #!/bin/bash
 # AmorAI LTX Worker — Model Download Script
+# Exact 1-to-1 match with community LTX 2.3 workflow template.
 # Models download once to the network volume, then persist across all serverless workers.
 
 set -e
@@ -112,32 +113,13 @@ LIGHTRICKS_BASE="https://huggingface.co/Lightricks/LTX-2.3/resolve/main"
 KIJAI_BASE="https://huggingface.co/Kijai/LTX2.3_comfy/resolve/main"
 
 ###############################################################################
-# REQUIRED: Text Encoder (fp8 — used by workflow for prompt encoding, ~12GB)
+# REQUIRED: Text Encoder — gemma fp8 SCALED variant (community template uses this)
+# ~13 GB. The "scaled" variant uses per-tensor scaling for higher quality than e4m3fn.
 ###############################################################################
 echo "[INFO] === Text Encoders ==="
-download "https://huggingface.co/GitMylo/LTX-2-comfy_gemma_fp8_e4m3fn/resolve/main/gemma_3_12B_it_fp8_e4m3fn.safetensors" \
-         "$TXT/gemma_3_12B_it_fp8_e4m3fn.safetensors" \
-         11811160064   # 11 GiB minimum (actual ~12.3 GiB)
-
-# Optional: fp4 variant (~6GB). Lower quality than fp8. Set true if you want
-# to experiment with a faster/smaller text encoder. Not used by default workflow.
-if [ "${DOWNLOAD_GEMMA_FP4:-false}" == "true" ]; then
-    download "https://huggingface.co/Comfy-Org/ltx-2/resolve/main/split_files/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors" \
-             "$TXT/gemma_3_12B_it_fp4_mixed.safetensors"
-fi
-
-###############################################################################
-# REQUIRED: LoRAs
-###############################################################################
-echo "[INFO] === Shared LoRAs ==="
-download "https://huggingface.co/Comfy-Org/ltx-2/resolve/main/split_files/loras/gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors" \
-         "$LORA/gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors"
-
-# Optional: older distilled LoRA (384-step). Not used — workflow uses 1.1 version.
-if [ "${DOWNLOAD_DISTILLED_LORA_384:-false}" == "true" ]; then
-    download "${LIGHTRICKS_BASE}/ltx-2.3-22b-distilled-lora-384.safetensors" \
-             "$LORA/ltx-2.3-22b-distilled-lora-384.safetensors"
-fi
+download "${KIJAI_BASE}/text_encoders/gemma_3_12B_it_fp8_scaled.safetensors" \
+         "$TXT/gemma_3_12B_it_fp8_scaled.safetensors" \
+         11811160064   # 11 GiB minimum
 
 ###############################################################################
 # REQUIRED: VAE
@@ -153,20 +135,14 @@ download "${KIJAI_BASE}/vae/LTX23_audio_vae_bf16.safetensors" \
          "$VAE/LTX23_audio_vae_bf16.safetensors"
 
 ###############################################################################
-# REQUIRED: Spatial Upscaler v1.0 (used by workflow)
-# Optional: v1.1 — newer version, set true to test if quality is better
+# REQUIRED: Spatial Upscaler v1.1 (community template uses this version)
 ###############################################################################
 echo "[INFO] === Upscalers ==="
-download "${LIGHTRICKS_BASE}/ltx-2.3-spatial-upscaler-x2-1.0.safetensors" \
-         "$LATENT_UP/ltx-2.3-spatial-upscaler-x2-1.0.safetensors"
-
-if [ "${DOWNLOAD_UPSCALER_V11:-false}" == "true" ]; then
-    download "${LIGHTRICKS_BASE}/ltx-2.3-spatial-upscaler-x2-1.1.safetensors" \
-             "$LATENT_UP/ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
-fi
+download "${LIGHTRICKS_BASE}/ltx-2.3-spatial-upscaler-x2-1.1.safetensors" \
+         "$LATENT_UP/ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
 
 ###############################################################################
-# REQUIRED: 10Eros base model (~29GB) — primary model for the i2v workflow
+# REQUIRED: 10Eros base model (~29 GB) — primary checkpoint
 ###############################################################################
 echo "[INFO] === 10Eros Model ==="
 download "${TENEROS_BASE}/10Eros_v1-fp8mixed_learned.safetensors" \
@@ -174,22 +150,39 @@ download "${TENEROS_BASE}/10Eros_v1-fp8mixed_learned.safetensors" \
          27917287424   # 26 GiB minimum (actual ~29.2 GiB)
 
 ###############################################################################
-# REQUIRED: SulphurEXP LoRA (~2.35GB) — applied at strength 0.3 over 10Eros
+# REQUIRED: SulphurEXP LoRA (~2.35 GB) — applied at strength 0.3 over 10Eros
 ###############################################################################
 echo "[INFO] === SulphurEXP LoRA ==="
 download "https://huggingface.co/maximsobolev275/LTX-SulphurExperimental-LoRA-Optimized/resolve/main/LTX_SulphurEXP_LoRA_fro99-avgrank105.safetensors" \
          "$LORA/LTX_SulphurEXP_LoRA_fro99-avgrank105.safetensors"
 
 ###############################################################################
-# REQUIRED: Distilled LoRA for fast inference
+# REQUIRED: Distilled LoRAs
+# First pass:  distilled-lora-1.1 @ strength 1.0
+# Final pass:  distilled-lora-384-1.1 @ strength 0.5  (community uses this for refinement)
 ###############################################################################
-echo "[INFO] === Distilled LoRA ==="
+echo "[INFO] === Distilled LoRAs ==="
 download "${SULPHUR_BASE}/distill_loras/ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors" \
          "$LORA_LTX23/ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors"
 
+download "${LIGHTRICKS_BASE}/ltx-2.3-22b-distilled-lora-384-1.1.safetensors" \
+         "$LORA_LTX23/ltx-2.3-22b-distilled-lora-384-1.1.safetensors"
+
 ###############################################################################
-# Optional: Legacy Sulphur-2 models (kept for reference, not used by workflow)
-# Set DOWNLOAD_SULPHUR_LEGACY=true to download these.
+# Optional: Sulphur Prompt Enhancer (~10 GB)
+# Enhances short user prompts into detailed video descriptions before generation.
+# Requires llama-cpp-python. Set DOWNLOAD_PROMPT_ENHANCER=false to skip.
+###############################################################################
+if [ "${DOWNLOAD_PROMPT_ENHANCER:-true}" == "true" ]; then
+    echo "[INFO] === Sulphur Prompt Enhancer ==="
+    download "${SULPHUR_BASE}/prompt_enhancer/sulphur_prompt_enhancer_model-q8_0.gguf" \
+             "$PE/sulphur_prompt_enhancer_model-q8_0.gguf"
+    download "${SULPHUR_BASE}/prompt_enhancer/mmproj-BF16.gguf" \
+             "$PE/mmproj-BF16.gguf"
+fi
+
+###############################################################################
+# Optional: Legacy / experimental models (disabled by default)
 ###############################################################################
 if [ "${DOWNLOAD_SULPHUR_LEGACY:-false}" == "true" ]; then
     echo "[INFO] === Legacy Sulphur-2 Models ==="
@@ -201,27 +194,10 @@ if [ "${DOWNLOAD_SULPHUR_LEGACY:-false}" == "true" ]; then
              9663676416
 fi
 
-###############################################################################
-# Optional: LTX-2.3 Full Dev FP8 (~29GB)
-# Vanilla (non-NSFW) base model. Only needed if running non-Sulphur workflows.
-###############################################################################
 if [ "${DOWNLOAD_LTX23_FULL_FP8:-false}" == "true" ]; then
     echo "[INFO] === LTX-2.3 Full Dev FP8 ==="
     download "https://huggingface.co/Lightricks/LTX-2.3-fp8/resolve/main/ltx-2.3-22b-dev-fp8.safetensors" \
              "$CKPT/ltx-2.3-22b-dev-fp8.safetensors"
-fi
-
-###############################################################################
-# Optional: Sulphur Prompt Enhancer (~10GB)
-# Enhances short user prompts into detailed video descriptions before generation.
-# Requires llama-cpp-python. Set DOWNLOAD_PROMPT_ENHANCER=false to skip.
-###############################################################################
-if [ "${DOWNLOAD_PROMPT_ENHANCER:-true}" == "true" ]; then
-    echo "[INFO] === Sulphur Prompt Enhancer ==="
-    download "${SULPHUR_BASE}/prompt_enhancer/sulphur_prompt_enhancer_model-q8_0.gguf" \
-             "$PE/sulphur_prompt_enhancer_model-q8_0.gguf"
-    download "${SULPHUR_BASE}/prompt_enhancer/mmproj-BF16.gguf" \
-             "$PE/mmproj-BF16.gguf"
 fi
 
 echo "[INFO] All model downloads complete."
