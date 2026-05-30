@@ -29,7 +29,7 @@ RUN pip install --no-cache-dir "kornia==0.7.4" && \
     KORNIA_DIR=$(python3 -c "import kornia, pathlib; print(pathlib.Path(kornia.__file__).parent)") && \
     find "$KORNIA_DIR" -name "*.py" -exec sed -i '/^@torch\.jit\.script$/d' {} \;
 
-RUN CMAKE_ARGS="-DGGML_CUDA=OFF" pip install --no-cache-dir \
+RUN CMAKE_ARGS="-DGGML_CUDA=OFF -DGGML_NATIVE=OFF -DGGML_AVX512=OFF" pip install --no-cache-dir \
     --timeout 600 --retries 3 \
     "llama-cpp-python>=0.3.2"
 
