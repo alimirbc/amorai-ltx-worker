@@ -53,6 +53,29 @@ def wait_for_comfyui(timeout=300):
     return False
 
 
+def _make_llava_handler(clip_model_path: str):
+    """
+    Try known handler class names in order — llama-cpp-python renamed
+    LlavaR11ChatHandler to Llava16ChatHandler in recent releases.
+    """
+    handler_names = [
+        "Llava16ChatHandler",
+        "LlavaR11ChatHandler",
+        "Llava15ChatHandler",
+    ]
+    for name in handler_names:
+        try:
+            mod = __import__("llama_cpp.llama_chat_format", fromlist=[name])
+            cls = getattr(mod, name)
+            handler = cls(clip_model_path=clip_model_path, verbose=False)
+            print(f"[prompt-enhancer] Multimodal handler: {name}", flush=True)
+            return handler
+        except (ImportError, AttributeError):
+            continue
+    print("[prompt-enhancer] No multimodal handler found — image input disabled", flush=True)
+    return None
+
+
 def load_enhancer():
     global enhancer_llm
     if not os.path.exists(PROMPT_ENHANCER_MODEL) or not os.path.exists(PROMPT_ENHANCER_MMPROJ):
@@ -60,12 +83,8 @@ def load_enhancer():
         return
     try:
         from llama_cpp import Llama
-        from llama_cpp.llama_chat_format import LlavaR11ChatHandler
         print("[prompt-enhancer] Loading model...", flush=True)
-        chat_handler = LlavaR11ChatHandler(
-            clip_model_path=PROMPT_ENHANCER_MMPROJ,
-            verbose=False,
-        )
+        chat_handler = _make_llava_handler(PROMPT_ENHANCER_MMPROJ)
         enhancer_llm = Llama(
             model_path=PROMPT_ENHANCER_MODEL,
             chat_handler=chat_handler,
