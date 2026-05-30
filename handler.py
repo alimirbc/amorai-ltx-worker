@@ -336,3 +336,4 @@ if __name__ == "__main__":
 
     print("[INFO] Starting RunPod serverless handler...", flush=True)
     runpod.serverless.start({"handler": handler})
+    
