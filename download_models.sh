@@ -117,7 +117,7 @@ KIJAI_BASE="https://huggingface.co/Kijai/LTX2.3_comfy/resolve/main"
 # ~13 GB. The "scaled" variant uses per-tensor scaling for higher quality than e4m3fn.
 ###############################################################################
 echo "[INFO] === Text Encoders ==="
-download "${KIJAI_BASE}/text_encoders/gemma_3_12B_it_fp8_scaled.safetensors" \
+download "https://huggingface.co/Comfy-Org/ltx-2/resolve/main/split_files/text_encoders/gemma_3_12B_it_fp8_scaled.safetensors" \
          "$TXT/gemma_3_12B_it_fp8_scaled.safetensors" \
          11811160064   # 11 GiB minimum
 
