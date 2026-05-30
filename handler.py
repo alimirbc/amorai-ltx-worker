@@ -155,8 +155,32 @@ def queue_workflow(workflow: dict) -> tuple[str, str]:
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")
         print(f"[ERROR] ComfyUI /prompt rejected ({e.code}): {body}", flush=True)
-        raise urllib.error.HTTPError(e.url, e.code, f"{e.reason} | body: {body}", e.headers, None)
+        raise RuntimeError(f"ComfyUI rejected prompt (HTTP {e.code}): {body}")
+
+    if "error" in result:
+        err = result["error"]
+        print(f"[ERROR] ComfyUI prompt validation failed: {json.dumps(err, indent=2)}", flush=True)
+        raise RuntimeError(f"ComfyUI prompt validation failed: {err}")
+
     return result["prompt_id"], client_id
+
+
+def _log_comfyui_errors(messages: list) -> None:
+    for msg in messages:
+        mtype = msg[0] if isinstance(msg, (list, tuple)) else msg.get("type", "")
+        mdata = msg[1] if isinstance(msg, (list, tuple)) and len(msg) > 1 else msg.get("data", msg)
+        if mtype == "execution_error" or (isinstance(mdata, dict) and mdata.get("exception_message")):
+            data = mdata if isinstance(mdata, dict) else {}
+            node_id  = data.get("node_id", "?")
+            node_type = data.get("node_type", "?")
+            exc_msg  = data.get("exception_message", "")
+            exc_type = data.get("exception_type", "")
+            tb = data.get("traceback", [])
+            print(f"[ERROR] Execution error at node {node_id} ({node_type}): {exc_type}: {exc_msg}", flush=True)
+            if tb:
+                print("[ERROR] Traceback:\n" + "".join(tb), flush=True)
+        else:
+            print(f"[ERROR] Workflow message: {msg}", flush=True)
 
 
 def poll_for_completion(prompt_id: str, timeout: int = 600) -> dict | None:
@@ -222,7 +246,11 @@ def handler(job):
                 print(f"[WARN] Failed to upload image {name}: {e}", flush=True)
 
     print(f"[INFO] Queueing workflow...", flush=True)
-    prompt_id, _ = queue_workflow(workflow)
+    try:
+        prompt_id, _ = queue_workflow(workflow)
+    except Exception as e:
+        print(f"[ERROR] Failed to queue workflow: {e}", flush=True)
+        return {"error": f"Failed to queue workflow: {e}"}
     print(f"[INFO] Prompt ID: {prompt_id}", flush=True)
 
     history = poll_for_completion(prompt_id)
@@ -232,6 +260,8 @@ def handler(job):
     status = history.get("status", {})
     if status.get("status_str") == "error":
         messages = status.get("messages", [])
+        print(f"[ERROR] Workflow status=error, logging messages:", flush=True)
+        _log_comfyui_errors(messages)
         return {"error": f"Workflow failed: {messages}"}
 
     output_files = collect_output_files(history.get("outputs", {}))
@@ -240,10 +270,36 @@ def handler(job):
 
     results = []
     for fpath in output_files:
-        with open(fpath, "rb") as f:
-            data = base64.b64encode(f.read()).decode()
         ext = os.path.splitext(fpath)[1].lower()
         file_type = "video" if ext in (".mp4", ".webm", ".avi", ".mov") else "image"
+
+        # Re-encode video to H.264 CRF 14 — matches community template quality.
+        # SaveVideo "auto" codec produces poor quality; ffmpeg is available on the worker.
+        if file_type == "video":
+            reenc = fpath + ".h264.mp4"
+            try:
+                subprocess.run(
+                    [
+                        "ffmpeg", "-y", "-i", fpath,
+                        "-c:v", "libx264", "-crf", "14", "-preset", "fast",
+                        "-pix_fmt", "yuv420p",
+                        "-c:a", "aac", "-b:a", "192k",
+                        "-movflags", "+faststart",
+                        reenc,
+                    ],
+                    check=True,
+                    capture_output=True,
+                    timeout=180,
+                )
+                os.replace(reenc, fpath)
+                print(f"[INFO] Re-encoded {os.path.basename(fpath)} → H.264 CRF 14 / AAC 192k", flush=True)
+            except Exception as e:
+                print(f"[WARN] ffmpeg re-encode failed, using original: {e}", flush=True)
+                if os.path.exists(reenc):
+                    os.remove(reenc)
+
+        with open(fpath, "rb") as f:
+            data = base64.b64encode(f.read()).decode()
         results.append(
             {"filename": os.path.basename(fpath), "type": file_type, "data": data}
         )
