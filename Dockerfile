@@ -39,3 +39,4 @@ COPY amorai_start.sh /amorai_start.sh
 RUN chmod +x /download_models.sh /amorai_start.sh
 
 CMD ["/amorai_start.sh"]
+
